@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">HexCro</string>
+    <string name="accessibility_service_description">HexCro uses this to send jump taps as a fallback when Shizuku is unavailable.</string>
+</resources>
