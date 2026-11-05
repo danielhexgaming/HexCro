@@ -17,10 +17,6 @@ import android.util.Log
 import android.os.Handler
 import android.os.Looper
 import androidx.core.app.NotificationCompat
-import com.example.hexcro.HexCroService
-import com.example.hexcro.MainActivity
-import com.example.hexcro.TapInjector
-import com.example.hexcro.IHexCroCallback
 import rikka.shizuku.Shizuku
 import org.json.JSONArray
 import org.json.JSONObject
@@ -86,15 +82,20 @@ class HexCroForegroundService : Service() {
 
     private fun sendAntiAfkWebhook(success: Boolean) {
         val prefs = getSharedPreferences("HexCro", Context.MODE_PRIVATE)
+
+        // Check if the user disabled anti-AFK webhooks
+        val webhookEnabled = prefs.getBoolean("antiAfkWebhookEnabled", true)
+        if (!webhookEnabled) return
+
         val webhook = prefs.getString("webhook", "").orEmpty().trim()
         if (webhook.isEmpty()) return
 
         Thread {
             try {
                 val embed = JSONObject().apply {
-                    put("title", if (success) "Anti-AFK tap sent" else "⚠️ Anti-AFK tap failed")
+                    put("title", if (success) "🚶 Anti-AFK tap sent" else "⚠️ Anti-AFK tap failed")
                     put("color", if (success) 0x6C5CE7 else 0xEF5350)
-                    put("footer", JSONObject().put("text", "HexCro | v1.1.0"))
+                    put("footer", JSONObject().put("text", "HexCro | v1.1.1"))
                 }
                 val payload = JSONObject().apply { put("embeds", JSONArray().put(embed)) }
 
@@ -103,6 +104,8 @@ class HexCroForegroundService : Service() {
                 conn.setRequestProperty("Content-Type", "application/json")
                 conn.setRequestProperty("User-Agent", "HexCro")
                 conn.doOutput = true
+                conn.connectTimeout = 5000
+                conn.readTimeout = 5000
                 conn.outputStream.use { it.write(payload.toString().toByteArray()) }
                 Log.i("HexCro", "FG: anti-AFK webhook -> ${conn.responseCode}")
                 conn.disconnect()

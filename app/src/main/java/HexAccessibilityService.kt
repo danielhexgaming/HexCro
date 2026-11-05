@@ -34,8 +34,12 @@ class HexCroAccessibilityService : AccessibilityService() {
         /** Queue a tap at absolute screen pixels. Returns true if queued. */
         fun tap(x: Int, y: Int): Boolean {
             val svc = instance ?: return false
-            val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
-            val stroke = GestureDescription.StrokeDescription(path, 0L, 80L)
+
+            val path = Path().apply {
+                moveTo(x.toFloat(), y.toFloat())
+                lineTo(x.toFloat() + 1f, y.toFloat() + 1f)
+            }
+            val stroke = GestureDescription.StrokeDescription(path, 0L, 100L)
             val gesture = GestureDescription.Builder().addStroke(stroke).build()
             val queued = svc.dispatchGesture(gesture, null, null)
             Log.i(TAG, "a11y tap: $x,$y queued=$queued")

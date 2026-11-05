@@ -34,9 +34,6 @@ import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.NotificationManagerCompat
-import com.example.hexcro.TapInjector
-import com.example.hexcro.HexCroForegroundService
-import com.example.hexcro.JumpSetupActivity
 import org.json.JSONObject
 import rikka.shizuku.Shizuku
 
@@ -83,8 +80,10 @@ class MainActivity : ComponentActivity(), HexCroForegroundService.Listener {
     private lateinit var antiAfkToggleBtn: Button
     private lateinit var antiAfkIntervalSlider: SeekBar
     private lateinit var antiAfkIntervalValue: TextView
+    private lateinit var antiAfkWebhookToggleBtn: Button
     private lateinit var antiAfkStatus: TextView
     private var antiAfkEnabled = false
+    private var antiAfkWebhookEnabled = true
 
     private lateinit var streamStatus: TextView
     private lateinit var logView: TextView
@@ -190,7 +189,7 @@ class MainActivity : ComponentActivity(), HexCroForegroundService.Listener {
                         v.animate().scaleX(1f).scaleY(1f).setDuration(120).start()
                     }
                 }
-                return false // don't consume — the click listener still fires
+                return false
             }
         })
     }
@@ -246,20 +245,18 @@ class MainActivity : ComponentActivity(), HexCroForegroundService.Listener {
     private fun updateAntiAfkUi() {
         runOnUiThread {
             if (!::antiAfkToggleBtn.isInitialized) return@runOnUiThread
+            if (!::antiAfkWebhookToggleBtn.isInitialized) return@runOnUiThread
 
             val a11yOk = TapInjector.canTap()
-
-            // If anti-AFK is on but accessibility is off, force it off
-            if (antiAfkEnabled && !a11yOk) {
-                antiAfkEnabled = false
-                prefs.edit().putBoolean("antiAfkEnabled", false).apply()
-                fgService?.setAntiAfkEnabled(false)
-                event("Anti-AFK auto-disabled — accessibility lost")
-            }
 
             antiAfkToggleBtn.text = if (antiAfkEnabled) "Anti-AFK: ON" else "Anti-AFK: OFF"
             antiAfkToggleBtn.background = rounded(
                 if (antiAfkEnabled) SUCCESS_COLOR else DISABLED_COLOR, 14
+            )
+
+            antiAfkWebhookToggleBtn.text = if (antiAfkWebhookEnabled) "Anti-AFK Embed: ON" else "Anti-AFK Embed: OFF"
+            antiAfkWebhookToggleBtn.background = rounded(
+                if (antiAfkWebhookEnabled) SUCCESS_COLOR else DISABLED_COLOR, 14
             )
 
             val interval = prefs.getInt("antiAfkInterval", 10)
@@ -270,14 +267,14 @@ class MainActivity : ComponentActivity(), HexCroForegroundService.Listener {
 
             val armed = fgService?.isAntiAfkArmed() ?: false
             antiAfkStatus.text = when {
-                !a11yOk -> "Accessibility service not connected"
+                antiAfkEnabled && !a11yOk -> "Accessibility disconnected — waiting to reconnect"
                 !antiAfkEnabled -> "Disabled"
                 armed -> "Armed — next tap in ~$interval min"
                 else -> "Enabled — waiting for biome"
             }
             antiAfkStatus.setTextColor(
                 when {
-                    !a11yOk -> STOP_COLOR
+                    antiAfkEnabled && !a11yOk -> STOP_COLOR
                     armed -> SUCCESS_COLOR
                     else -> MUTED_COLOR
                 }
@@ -726,7 +723,7 @@ class MainActivity : ComponentActivity(), HexCroForegroundService.Listener {
         stopBtn = styledButton("Stop HexCro")
 
         val version = TextView(this).apply {
-            text = "v1.1.0"; textSize = 11f
+            text = "v1.1.1"; textSize = 11f
             gravity = Gravity.CENTER; setTextColor(MUTED_COLOR)
         }
 
@@ -844,6 +841,20 @@ class MainActivity : ComponentActivity(), HexCroForegroundService.Listener {
             } catch (_: Exception) {}
         }
 
+        antiAfkWebhookEnabled = prefs.getBoolean("antiAfkWebhookEnabled", true)
+
+        antiAfkWebhookToggleBtn = styledButton(
+            if (antiAfkWebhookEnabled) "Anti-AFK Webhook: ON" else "Anti-AFK Webhook: OFF"
+        ).apply {
+            background = rounded(if (antiAfkWebhookEnabled) SUCCESS_COLOR else DISABLED_COLOR, 14)
+            setOnClickListener {
+                antiAfkWebhookEnabled = !antiAfkWebhookEnabled
+                prefs.edit().putBoolean("antiAfkWebhookEnabled", antiAfkWebhookEnabled).apply()
+                event("anti-AFK webhook ${if (antiAfkWebhookEnabled) "enabled" else "disabled"}")
+                updateAntiAfkUi()
+            }
+        }
+
         antiAfkStatus = TextView(this).apply {
             text = "Disabled"
             textSize = 13f
@@ -883,6 +894,9 @@ class MainActivity : ComponentActivity(), HexCroForegroundService.Listener {
             addView(antiAfkIntervalSlider, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { topMargin = dp(6) })
+            addView(antiAfkWebhookToggleBtn, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(16) })
         }
 
         val antiAfkTapCard = card().apply {
@@ -980,7 +994,7 @@ class MainActivity : ComponentActivity(), HexCroForegroundService.Listener {
                 setTypeface(null, Typeface.BOLD); setTextColor(TEXT_COLOR)
             })
             addView(TextView(this@MainActivity).apply {
-                text = "v1.1.0"; textSize = 12f
+                text = "v1.1.1"; textSize = 12f
                 setTextColor(MUTED_COLOR); setPadding(0, 0, 0, dp(12))
             })
             addView(TextView(this@MainActivity).apply {
@@ -1057,7 +1071,7 @@ class MainActivity : ComponentActivity(), HexCroForegroundService.Listener {
             setPadding(dp(20), dp(8), dp(20), dp(4))
         })
         drawer.addView(TextView(this).apply {
-            text = "v1.1.0"; textSize = 11f
+            text = "v1.1.1"; textSize = 11f
             setTextColor(0xFF8888AA.toInt())
             setPadding(dp(20), 0, dp(20), dp(28))
         })
